@@ -13,13 +13,13 @@ export default function DemoShell() {
       <Header />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel: Shopify checkout */}
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-200">
+        {/* Left: Gymshark checkout (58% of screen) */}
+        <div className="w-[58%] min-w-[600px] flex flex-col border-r border-gray-200 overflow-hidden">
           <CheckoutShell />
         </div>
 
-        {/* Right panel: API Inspector */}
-        <div className="w-[420px] flex-shrink-0 flex flex-col overflow-hidden">
+        {/* Right: API Inspector (remaining width) */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           <ApiInspector logs={apiLogs} />
         </div>
       </div>
