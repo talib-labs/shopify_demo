@@ -3,7 +3,6 @@
 import { AnimatePresence } from 'framer-motion';
 import { useDemoStore } from '@/store/demoStore';
 import BaseCheckoutForm from './BaseCheckoutForm';
-import ShopPayModal from './ShopPayModal';
 import ShopPayReview from './ShopPayReview';
 import OrderSummary from './OrderSummary';
 
@@ -16,7 +15,6 @@ export default function CheckoutShell() {
       <div className="flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
           {screen === 0 && <BaseCheckoutForm key="base" />}
-          {screen === 1 && <ShopPayModal key="modal" />}
           {screen >= 2 && <ShopPayReview key="review" />}
         </AnimatePresence>
       </div>
