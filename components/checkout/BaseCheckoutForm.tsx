@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDemoStore } from '@/store/demoStore';
 import {
@@ -9,40 +9,31 @@ import {
   mockGetAccounts,
 } from '@/lib/mock-api';
 
-const OTP_CODE = '847293';
+const OTP_LENGTH = 6;
 
-type OtpPhase = 'idle' | 'otp' | 'api1' | 'api2' | 'api3' | 'done';
+type OtpPhase = 'entry' | 'api1' | 'api2' | 'api3' | 'done';
 
 function ShopPayPopup({ onSuccess }: { onSuccess: () => void }) {
   const { setEntity, setAccounts, addApiLog, setLoading } = useDemoStore();
-  const [phase, setPhase] = useState<OtpPhase>('idle');
-  const [otpDigits, setOtpDigits] = useState<string[]>([]);
+  const [phase, setPhase] = useState<OtpPhase>('entry');
+  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [apiStatus, setApiStatus] = useState({ entity: false, connect: false, accounts: false });
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Start OTP auto-fill on mount
+  // Focus first box on mount
   useEffect(() => {
-    const t = setTimeout(() => setPhase('otp'), 400);
-    return () => clearTimeout(t);
+    setTimeout(() => inputRefs.current[0]?.focus(), 100);
   }, []);
 
-  // OTP digit-by-digit fill
+  // When all digits filled, fire APIs
   useEffect(() => {
-    if (phase !== 'otp') return;
-    const digits = OTP_CODE.split('');
-    let i = 0;
-    const iv = setInterval(() => {
-      if (i < digits.length) {
-        setOtpDigits((prev) => [...prev, digits[i]]);
-        i++;
-      } else {
-        clearInterval(iv);
-        setTimeout(() => setPhase('api1'), 350);
-      }
-    }, 270);
-    return () => clearInterval(iv);
-  }, [phase]);
+    if (phase !== 'entry') return;
+    if (digits.every((d) => d !== '')) {
+      setPhase('api1');
+    }
+  }, [digits, phase]);
 
-  // Fire API calls after OTP fills
+  // Fire API calls
   useEffect(() => {
     if (phase !== 'api1') return;
     const run = async () => {
@@ -71,6 +62,33 @@ function ShopPayPopup({ onSuccess }: { onSuccess: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  const handleDigitChange = (i: number, val: string) => {
+    const char = val.replace(/\D/g, '').slice(-1);
+    const next = [...digits];
+    next[i] = char;
+    setDigits(next);
+    if (char && i < OTP_LENGTH - 1) {
+      inputRefs.current[i + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !digits[i] && i > 0) {
+      inputRefs.current[i - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (!pasted) return;
+    e.preventDefault();
+    const next = [...digits];
+    pasted.split('').forEach((ch, idx) => { next[idx] = ch; });
+    setDigits(next);
+    const nextFocus = Math.min(pasted.length, OTP_LENGTH - 1);
+    inputRefs.current[nextFocus]?.focus();
+  };
+
   const apiSteps = [
     { key: 'entity',   label: 'Create Entity',       done: apiStatus.entity,   active: phase === 'api1' },
     { key: 'connect',  label: 'Connect Liabilities',  done: apiStatus.connect,  active: phase === 'api2' },
@@ -96,28 +114,34 @@ function ShopPayPopup({ onSuccess }: { onSuccess: () => void }) {
       <div className="px-4 py-3.5">
         {/* Phone line */}
         <p className="text-xs text-gray-500 mb-3">
-          Sending code to <span className="font-semibold text-gray-700">+1 (408) 555-1234</span>
+          Enter the code sent to <span className="font-semibold text-gray-700">+1 (408) 555-1234</span>
         </p>
 
-        {/* OTP boxes */}
-        <div className="flex gap-1.5 mb-3.5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
+        {/* OTP inputs */}
+        <div className="flex gap-1.5 mb-3.5" onPaste={handlePaste}>
+          {Array.from({ length: OTP_LENGTH }).map((_, i) => (
+            <input
               key={i}
-              className={`flex-1 h-10 rounded-md border-2 flex items-center justify-center text-sm font-bold transition-all duration-150 ${
-                otpDigits[i]
+              ref={(el) => { inputRefs.current[i] = el; }}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digits[i]}
+              disabled={phase !== 'entry'}
+              onChange={(e) => handleDigitChange(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              className={`flex-1 h-10 rounded-md border-2 text-center text-sm font-bold transition-all duration-150 focus:outline-none disabled:cursor-default ${
+                digits[i]
                   ? 'border-[#5A31F4] bg-[#5A31F4]/5 text-gray-900'
-                  : 'border-gray-200 text-transparent'
+                  : 'border-gray-200 text-gray-900 focus:border-[#5A31F4]'
               }`}
-            >
-              {otpDigits[i] ?? '0'}
-            </div>
+            />
           ))}
         </div>
 
-        {/* API progress — shows after OTP fills */}
+        {/* API progress — shows after all digits entered */}
         <AnimatePresence>
-          {phase !== 'idle' && phase !== 'otp' && (
+          {phase !== 'entry' && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
