@@ -18,18 +18,58 @@ function fmt(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+// Card brand images keyed by mch_id
+const CARD_IMAGES: Record<string, string> = {
+  mch_200145: 'https://static.methodfi.com/card_brands/1b7ccaba6535cb837f802d968add4700.png', // Chase Sapphire Reserve
+  mch_302686: 'https://static.methodfi.com/card_brands/e0cf0b8789a683d5ca457ea21e634b6b.png', // Capital One Platinum
+  mch_189981: 'https://static.methodfi.com/card_brands/ea2fdc4a7ace226fae9bcc5d321a884f.png', // Bank of America Rewards
+};
+
 function getBrandColor(name: string): string {
   if (name.toLowerCase().includes('chase')) return '#117ACA';
-  if (name.toLowerCase().includes('amex')) return '#016FD0';
-  if (name.toLowerCase().includes('apple')) return '#555555';
+  if (name.toLowerCase().includes('capital one')) return '#D03027';
+  if (name.toLowerCase().includes('bank of america')) return '#E31837';
   return '#1a1a1a';
 }
 
 function getBrandInitials(name: string): string {
   if (name.toLowerCase().includes('chase')) return 'CH';
-  if (name.toLowerCase().includes('amex')) return 'AX';
-  if (name.toLowerCase().includes('apple')) return 'AC';
+  if (name.toLowerCase().includes('capital one')) return 'C1';
+  if (name.toLowerCase().includes('bank of america')) return 'BA';
   return name.slice(0, 2).toUpperCase();
+}
+
+function CardThumb({
+  mchId,
+  name,
+  size = 'sm',
+}: {
+  mchId: string;
+  name: string;
+  size?: 'sm' | 'md';
+}) {
+  const imgUrl = CARD_IMAGES[mchId];
+  const sizeClass = size === 'sm' ? 'w-10 h-7' : 'w-12 h-8';
+  const textSize = size === 'sm' ? 'text-[9px]' : 'text-[10px]';
+
+  if (imgUrl) {
+    return (
+      <img
+        src={imgUrl}
+        alt={name}
+        className={`${sizeClass} rounded-md object-cover flex-shrink-0`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${sizeClass} rounded-md flex items-center justify-center flex-shrink-0`}
+      style={{ backgroundColor: getBrandColor(name) }}
+    >
+      <span className={`${textSize} font-bold text-white`}>{getBrandInitials(name)}</span>
+    </div>
+  );
 }
 
 function AccountCard({
@@ -56,13 +96,8 @@ function AccountCard({
           {selected && <div className="w-2 h-2 rounded-full bg-gray-900" />}
         </div>
 
-        {/* Card icon */}
-        <div
-          className="w-10 h-7 rounded-md flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: getBrandColor(account.liability.name) }}
-        >
-          <span className="text-[9px] font-bold text-white">{getBrandInitials(account.liability.name)}</span>
-        </div>
+        {/* Card image */}
+        <CardThumb mchId={account.liability.mch_id} name={account.liability.name} size="sm" />
 
         {/* Info */}
         <div className="flex-1 min-w-0">
@@ -85,6 +120,7 @@ function Spinner() {
 
 export default function ShopPayReview() {
   const {
+    entity,
     accounts,
     selectedAccount,
     setSelectedAccount,
@@ -176,7 +212,7 @@ export default function ShopPayReview() {
               </p>
             </div>
 
-            <div className="space-y-2.5 mb-6">
+            <div className="space-y-2.5 mb-4">
               {accounts.map((acc) => (
                 <AccountCard
                   key={acc.id}
@@ -186,6 +222,29 @@ export default function ShopPayReview() {
                 />
               ))}
             </div>
+
+            {/* Shipping address */}
+            {entity?.address && (
+              <div className="border border-gray-200 rounded-xl p-4 mb-5">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Ship to</p>
+                <div className="flex items-start gap-2.5">
+                  <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/>
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">
+                      {entity.individual?.first_name} {entity.individual?.last_name}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{entity.address.line1}</p>
+                    <p className="text-xs text-gray-500">{entity.address.city}, {entity.address.state} {entity.address.zip}</p>
+                    <button className="text-xs text-blue-600 hover:underline mt-1.5 cursor-pointer">
+                      Edit shipping address
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={handleContinueToPayment}
@@ -223,12 +282,7 @@ export default function ShopPayReview() {
 
             {/* Selected card */}
             <div className="border border-gray-200 rounded-xl p-4 mb-5 flex items-center gap-3">
-              <div
-                className="w-12 h-8 rounded-md flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: getBrandColor(selectedAccount.liability.name) }}
-              >
-                <span className="text-[10px] font-bold text-white">{getBrandInitials(selectedAccount.liability.name)}</span>
-              </div>
+              <CardThumb mchId={selectedAccount.liability.mch_id} name={selectedAccount.liability.name} size="md" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-gray-800">{selectedAccount.liability.name}</p>
                 <p className="text-xs text-gray-400">···· {selectedAccount.liability.mask}</p>
@@ -271,9 +325,6 @@ export default function ShopPayReview() {
               Place order · {fmt(CART_TOTAL)}
             </button>
 
-            <p className="text-center text-[11px] text-gray-400 mt-3">
-              Method retrieves card details securely — no manual card entry in production
-            </p>
           </motion.div>
         )}
 
