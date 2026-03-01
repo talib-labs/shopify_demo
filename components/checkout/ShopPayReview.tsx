@@ -155,7 +155,7 @@ export default function ShopPayReview() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="px-8 py-7 w-full"
+      className="px-8 py-7 w-full min-h-full"
     >
       <AnimatePresence mode="wait">
 
