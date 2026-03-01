@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDemoStore } from '@/store/demoStore';
 import {
-  mockCreateVerificationSession,
-  mockUpdateVerification,
+  mockCreateNetworkVerificationSession,
+  mockUpdateNetworkVerification,
   mockGetAccountSensitive,
-  mockAuthorizePayment,
+  mockShopifyTokenize,
 } from '@/lib/mock-api';
 import { CART_TOTAL } from './OrderSummary';
 import { Account } from '@/types';
@@ -41,11 +41,6 @@ function AccountCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  const apr =
-    account.interest_rate_min !== undefined
-      ? `${account.interest_rate_min}–${account.interest_rate_max}% APR`
-      : `${account.interest_rate}% APR`;
-
   return (
     <button
       onClick={onClick}
@@ -72,13 +67,7 @@ function AccountCard({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-800 leading-tight">{account.liability.name}</p>
-          <p className="text-xs text-gray-400 mt-0.5">···· {account.liability.mask} · {apr}</p>
-        </div>
-
-        {/* Balance */}
-        <div className="text-right flex-shrink-0">
-          <p className="text-[10px] text-gray-400">Balance</p>
-          <p className="text-sm font-semibold text-gray-800">{fmt(account.balance)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">···· {account.liability.mask}</p>
         </div>
       </div>
     </button>
@@ -99,6 +88,7 @@ export default function ShopPayReview() {
     accounts,
     selectedAccount,
     setSelectedAccount,
+    verificationSession,
     setVerificationSession,
     setSensitiveData,
     setPaymentToken,
@@ -114,33 +104,35 @@ export default function ShopPayReview() {
     if (!selectedAccount) return;
     setPhase('loading_details');
 
-    const { data: session, log: sessionLog } = await mockCreateVerificationSession(
-      selectedAccount.holder_id
+    const { data: session, log: sessionLog } = await mockCreateNetworkVerificationSession(
+      selectedAccount.id
     );
     setVerificationSession(session);
     addApiLog(sessionLog);
-
-    const { data: verified, log: verifyLog } = await mockUpdateVerification(
-      selectedAccount.holder_id,
-      session.id,
-      '847293'
-    );
-    setVerificationSession(verified);
-    addApiLog(verifyLog);
 
     setPhase('cvv');
   };
 
   const handlePlaceOrder = async () => {
-    if (!selectedAccount || cvv.length < 3) return;
+    if (!selectedAccount || cvv.length < 3 || !verificationSession) return;
     setPhase('placing');
+
+    const { data: verified, log: verifyLog } = await mockUpdateNetworkVerification(
+      selectedAccount.id,
+      verificationSession.id,
+      cvv
+    );
+    setVerificationSession(verified);
+    addApiLog(verifyLog);
 
     const { data: sensitive, log: sensitiveLog } = await mockGetAccountSensitive(selectedAccount.id);
     setSensitiveData(sensitive);
     addApiLog(sensitiveLog);
 
-    const { data: token, log: paymentLog } = await mockAuthorizePayment(
-      selectedAccount.id,
+    const { data: token, log: paymentLog } = await mockShopifyTokenize(
+      sensitive.number,
+      sensitive.expiration ?? '12/27',
+      cvv,
       CART_TOTAL
     );
     setPaymentToken(token);
@@ -179,7 +171,7 @@ export default function ShopPayReview() {
                 alt="Method"
               />
               <p className="text-xs text-violet-700">
-                <span className="font-semibold">Method found {accounts.length} linked cards.</span>{' '}
+                <span className="font-semibold">Method found {accounts.length} cards that can be linked.</span>{' '}
                 Pay with an existing card — no number entry needed.
               </p>
             </div>
@@ -244,20 +236,6 @@ export default function ShopPayReview() {
               <button onClick={() => setPhase('select')} className="text-xs text-blue-600 hover:underline cursor-pointer">
                 Change
               </button>
-            </div>
-
-            {/* Account stats from Method */}
-            <div className="grid grid-cols-3 gap-2.5 mb-5">
-              {[
-                { label: 'Balance', value: fmt(selectedAccount.balance) },
-                { label: 'Credit Limit', value: fmt(selectedAccount.credit_limit ?? 0) },
-                { label: 'Min Payment', value: fmt(selectedAccount.next_payment_minimum_amount ?? 0) },
-              ].map(({ label, value }) => (
-                <div key={label} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
-                  <p className="text-sm font-bold text-gray-800 mt-0.5">{value}</p>
-                </div>
-              ))}
             </div>
 
             {/* CVV */}
@@ -352,7 +330,7 @@ export default function ShopPayReview() {
               />
               <div>
                 <p className="text-xs font-semibold text-gray-700">Powered by Method Financial</p>
-                <p className="text-[11px] text-gray-400">7 API calls · Frictionless card retrieval</p>
+                <p className="text-[11px] text-gray-400">6 Method API calls · 1 Shopify tokenization</p>
               </div>
             </div>
 

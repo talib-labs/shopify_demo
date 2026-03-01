@@ -109,7 +109,7 @@ function OtpModal({ email, onClose, onSuccess }: { email: string; onClose: () =>
 
           <p className="text-sm text-gray-600 mb-5 leading-snug">
             Enter the code sent to{' '}
-            <span className="font-semibold">+1 ••• ••• •990</span>{' '}
+            <span className="font-semibold">+1 ••• ••• •123</span>{' '}
             to securely use your saved information.
           </p>
 

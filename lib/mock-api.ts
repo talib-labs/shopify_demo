@@ -253,49 +253,44 @@ export async function mockGetAccounts(
   return { data: MOCK_ACCOUNTS, log };
 }
 
-/** API 4: Create Verification Session */
-export async function mockCreateVerificationSession(
-  entityId: string
+/** API 4: Create Network Verification Session (on account, not entity) */
+export async function mockCreateNetworkVerificationSession(
+  accountId: string
 ): Promise<{ data: VerificationSession; log: ApiLog }> {
   const start = Date.now();
   await randomDelay();
   const duration = Date.now() - start;
 
   const data: VerificationSession = {
-    id: `evf_${genId().slice(0, 13)}`,
-    entity_id: entityId,
+    id: `avf_${genId().slice(0, 13)}`,
+    account_id: accountId,
     status: 'pending',
-    type: 'sms',
-    sms: { phone: '+14085551234' },
+    type: 'network',
     verified_at: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  const requestBody = {
-    type: 'sms',
-  };
-
   const log = makeLog(
     3,
-    'Create Verification Session',
+    'Create Network Verification Session',
     'POST',
-    `https://dev.methodfi.com/entities/${entityId}/verification_sessions`,
+    `https://dev.methodfi.com/accounts/${accountId}/verification_sessions`,
     DEFAULT_HEADERS,
-    requestBody,
+    { type: 'network' },
     data,
     duration,
-    'SMS verification session initiated'
+    'Network verification session opened on account'
   );
 
   return { data, log };
 }
 
-/** API 5: Update Verification Session (submit OTP code) */
-export async function mockUpdateVerification(
-  entityId: string,
+/** API 5: Update Network Verification Session (submit CVV) */
+export async function mockUpdateNetworkVerification(
+  accountId: string,
   sessionId: string,
-  smsCode: string
+  cvv: string
 ): Promise<{ data: VerificationSession; log: ApiLog }> {
   const start = Date.now();
   await randomDelay();
@@ -303,27 +298,26 @@ export async function mockUpdateVerification(
 
   const data: VerificationSession = {
     id: sessionId,
-    entity_id: entityId,
+    account_id: accountId,
     status: 'verified',
-    type: 'sms',
-    sms: { phone: '+14085551234' },
+    type: 'network',
     verified_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  const requestBody = { sms: { sms_code: smsCode } };
+  const requestBody = { network: { cvv } };
 
   const log = makeLog(
     4,
-    'Verify Phone (OTP)',
+    'Update Network Verification',
     'PUT',
-    `https://dev.methodfi.com/entities/${entityId}/verification_sessions/${sessionId}`,
+    `https://dev.methodfi.com/accounts/${accountId}/verification_sessions/${sessionId}`,
     DEFAULT_HEADERS,
     requestBody,
     data,
     duration,
-    'Phone number verified via OTP'
+    'Account verified via card network using CVV'
   );
 
   return { data, log };
@@ -366,44 +360,66 @@ export async function mockGetAccountSensitive(
   return { data, log };
 }
 
-/** API 7: Authorize Shopify Payment */
-export async function mockAuthorizePayment(
-  accountId: string,
+/** API 7: Tokenize card via Shopify Payments Vault (not a Method call) */
+export async function mockShopifyTokenize(
+  pan: string,
+  expiration: string,
+  cvv: string,
   amountCents: number
 ): Promise<{ data: ShopifyPaymentToken; log: ApiLog }> {
   const start = Date.now();
   await randomDelay();
   const duration = Date.now() - start;
 
+  const [expMonth, expYear] = expiration.split('/');
   const orderId = `GYM-${Math.floor(Math.random() * 90000) + 10000}`;
 
   const data: ShopifyPaymentToken = {
-    id: `pay_${genId().slice(0, 12)}`,
+    id: `shopify_vi_${genId().slice(0, 16)}`,
+    payment_instrument_type: 'credit_card',
     payment_token: `tok_${genId().slice(0, 20)}`,
+    last4: pan.slice(-4),
+    brand: 'visa',
+    expiry_month: parseInt(expMonth),
+    expiry_year: parseInt(`20${expYear}`),
+    order_id: orderId,
     amount: amountCents,
     currency: 'USD',
-    status: 'authorized',
-    order_id: orderId,
     created_at: new Date().toISOString(),
   };
 
   const requestBody = {
-    account_id: accountId,
-    amount: amountCents,
-    currency: 'USD',
-    reference_id: orderId,
+    payment_instrument: {
+      credit_card: {
+        number: pan,
+        expiry_month: expMonth,
+        expiry_year: `20${expYear}`,
+        verification_value: cvv,
+      },
+      billing_address: {
+        line1: '1234 Market St',
+        city: 'San Francisco',
+        province_code: 'CA',
+        zip: '94103',
+        country_code: 'US',
+      },
+    },
   };
 
   const log = makeLog(
     6,
-    'Authorize Payment',
+    'Tokenize Card (Shopify Payments Vault)',
     'POST',
-    'https://dev.methodfi.com/payments/authorize',
-    DEFAULT_HEADERS,
+    'https://checkout.shopify.com/sprinkles/v1/payment_instruments',
+    {
+      'X-Shopify-Access-Token': 'shpat_••••••••••••••••••••',
+      'Content-Type': 'application/json',
+    },
     requestBody,
     data,
     duration,
-    'Payment token sent to Shopify'
+    'PAN vaulted — Shopify returns payment instrument token',
+    { source: 'shopify' }
   );
 
   return { data, log };

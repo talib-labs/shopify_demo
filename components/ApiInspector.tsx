@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ApiLog } from '@/types';
 
@@ -17,17 +17,14 @@ function syntaxHighlight(json: unknown): string {
     .replace(
       /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
       (match) => {
-        let cls = 'text-[#79c0ff]'; // number
+        let cls = 'text-[#79c0ff]';
         if (/^"/.test(match)) {
-          if (/:$/.test(match)) {
-            cls = 'text-[#7ee787]'; // key
-          } else {
-            cls = 'text-[#a5d6ff]'; // string
-          }
+          if (/:$/.test(match)) cls = 'text-[#7ee787]';
+          else cls = 'text-[#a5d6ff]';
         } else if (/true|false/.test(match)) {
-          cls = 'text-[#ff7b72]'; // bool
+          cls = 'text-[#ff7b72]';
         } else if (/null/.test(match)) {
-          cls = 'text-[#8b949e]'; // null
+          cls = 'text-[#8b949e]';
         }
         return `<span class="${cls}">${match}</span>`;
       }
@@ -49,15 +46,52 @@ function MethodBadge({ method }: { method: ApiLog['method'] }) {
   );
 }
 
+function ShopifyBagIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <path d="M16 10a4 4 0 01-8 0"/>
+    </svg>
+  );
+}
+
+function SystemHandoff() {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <div className="flex-1 h-px bg-[#21262d]" />
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#161b22] border border-[#30363d]">
+        <ShopifyBagIcon className="w-3 h-3 text-[#96BF48]" />
+        <span className="text-[9px] text-[#8b949e] uppercase tracking-widest">Shopify Payments</span>
+        <svg className="w-2.5 h-2.5 text-[#484f58]" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L11 6.414V16a1 1 0 11-2 0V6.414L7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3z" clipRule="evenodd"/>
+        </svg>
+        <span className="text-[9px] text-[#8b949e] uppercase tracking-widest">Method Financial</span>
+      </div>
+      <div className="flex-1 h-px bg-[#21262d]" />
+    </div>
+  );
+}
+
 function LogEntry({ log, defaultOpen }: { log: ApiLog; defaultOpen: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [tab, setTab] = useState<'request' | 'response'>('request');
+  const [tab, setTab] = useState<'request' | 'response'>('response');
+
+  const isShopify = log.source === 'shopify';
+  const borderColor = isShopify ? '#96BF4840' : '#30363d';
+  const accentColor = isShopify ? '#96BF48' : '#238636';
+  const accentText = isShopify ? 'text-[#96BF48]' : 'text-[#3fb950]';
+  const labelColor = isShopify ? 'text-[#96BF48]' : 'text-[#58a6ff]';
+  const displayUrl = isShopify
+    ? log.url.replace('https://checkout.shopify.com', '')
+    : log.url.replace('https://dev.methodfi.com', '');
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="border border-[#30363d] rounded-lg overflow-hidden"
+      className="rounded-lg overflow-hidden"
+      style={{ border: `1px solid ${borderColor}` }}
     >
       {/* Header row */}
       <button
@@ -65,9 +99,12 @@ function LogEntry({ log, defaultOpen }: { log: ApiLog; defaultOpen: boolean }) {
         className="w-full flex items-center gap-2 px-3 py-2.5 bg-[#161b22] hover:bg-[#1c2128] transition-colors text-left"
       >
         <span className={`transition-transform duration-200 text-gray-500 text-xs ${open ? 'rotate-90' : ''}`}>▶</span>
+        {isShopify && <ShopifyBagIcon className="w-3.5 h-3.5 text-[#96BF48] flex-shrink-0" />}
         <MethodBadge method={log.method} />
-        <span className="text-[11px] text-[#8b949e] font-mono truncate flex-1">{log.url.replace('https://dev.methodfi.com', '')}</span>
-        <span className="text-[10px] text-[#3fb950] font-mono ml-auto flex-shrink-0">200</span>
+        <span className="text-[11px] text-[#8b949e] font-mono truncate flex-1">{displayUrl}</span>
+        <span className={`text-[10px] font-mono ml-auto flex-shrink-0 ${accentText}`}>
+          {isShopify ? 'Shopify' : '200'}
+        </span>
         <span className="text-[10px] text-gray-600 font-mono ml-2">{log.duration}ms</span>
       </button>
 
@@ -79,10 +116,10 @@ function LogEntry({ log, defaultOpen }: { log: ApiLog; defaultOpen: boolean }) {
             exit={{ height: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-[#0d1117] border-t border-[#30363d]">
+            <div className="bg-[#0d1117]" style={{ borderTop: `1px solid ${borderColor}` }}>
               {/* Label + description */}
               <div className="px-3 pt-2.5 pb-1.5">
-                <span className="text-[11px] font-semibold text-[#58a6ff]">{log.label}</span>
+                <span className={`text-[11px] font-semibold ${labelColor}`}>{log.label}</span>
                 {log.description && (
                   <span className="ml-2 text-[10px] text-[#8b949e]">— {log.description}</span>
                 )}
@@ -94,10 +131,9 @@ function LogEntry({ log, defaultOpen }: { log: ApiLog; defaultOpen: boolean }) {
                   <button
                     key={t}
                     onClick={() => setTab(t)}
+                    style={{ borderBottomColor: tab === t ? accentColor : 'transparent' }}
                     className={`text-[11px] py-1.5 px-3 capitalize transition-colors border-b-2 -mb-px ${
-                      tab === t
-                        ? 'border-[#238636] text-[#3fb950]'
-                        : 'border-transparent text-[#8b949e] hover:text-gray-300'
+                      tab === t ? accentText : 'text-[#8b949e] hover:text-gray-300'
                     }`}
                   >
                     {t}
@@ -137,8 +173,13 @@ function LogEntry({ log, defaultOpen }: { log: ApiLog; defaultOpen: boolean }) {
 }
 
 export default function ApiInspector({ logs }: Props) {
-  // Newest first
   const reversed = [...logs].reverse();
+  const methodCount = logs.filter((l) => l.source !== 'shopify').length;
+  const shopifyCount = logs.filter((l) => l.source === 'shopify').length;
+
+  const countLabel = shopifyCount > 0
+    ? `${methodCount} Method · ${shopifyCount} Shopify`
+    : `${logs.length} request${logs.length !== 1 ? 's' : ''}`;
 
   return (
     <div className="h-full bg-[#0d1117] flex flex-col overflow-hidden">
@@ -148,7 +189,7 @@ export default function ApiInspector({ logs }: Props) {
           <div className="w-2 h-2 rounded-full bg-[#238636] animate-pulse" />
           <span className="text-[12px] font-semibold text-gray-300 uppercase tracking-wider">API Inspector</span>
         </div>
-        <span className="text-[10px] text-[#8b949e] font-mono">{logs.length} request{logs.length !== 1 ? 's' : ''}</span>
+        <span className="text-[10px] text-[#8b949e] font-mono">{countLabel}</span>
       </div>
 
       {/* Logs */}
@@ -168,9 +209,16 @@ export default function ApiInspector({ logs }: Props) {
         )}
 
         <AnimatePresence initial={false}>
-          {reversed.map((log, i) => (
-            <LogEntry key={log.id} log={log} defaultOpen={i === 0} />
-          ))}
+          {reversed.map((log, i) => {
+            const prevLog = reversed[i - 1];
+            const showHandoff = prevLog?.source === 'shopify' && log.source !== 'shopify';
+            return (
+              <Fragment key={log.id}>
+                {showHandoff && <SystemHandoff />}
+                <LogEntry log={log} defaultOpen={i === 0} />
+              </Fragment>
+            );
+          })}
         </AnimatePresence>
       </div>
     </div>

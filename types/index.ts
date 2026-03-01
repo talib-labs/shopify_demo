@@ -68,10 +68,12 @@ export interface Account {
 
 export interface VerificationSession {
   id: string;
-  entity_id: string;
+  entity_id?: string;
+  account_id?: string;
   status: 'pending' | 'verified' | 'failed';
-  type: 'phone' | 'sms' | 'identity';
+  type: 'phone' | 'sms' | 'identity' | 'network';
   sms?: { phone: string };
+  network?: { cvv: string };
   verified_at: string | null;
   created_at: string;
   updated_at: string;
@@ -98,11 +100,15 @@ export interface AccountSensitive {
 
 export interface ShopifyPaymentToken {
   id: string;
+  payment_instrument_type: 'credit_card';
   payment_token: string;
+  last4: string;
+  brand: string;
+  expiry_month: number;
+  expiry_year: number;
+  order_id: string;
   amount: number;
   currency: string;
-  status: 'authorized' | 'captured';
-  order_id: string;
   created_at: string;
 }
 
@@ -121,6 +127,7 @@ export interface ApiLog {
   timestamp: string;
   label: string;
   description?: string;
+  source?: 'method' | 'shopify';
 }
 
 // ─── Order ────────────────────────────────────────────────────────────────────
